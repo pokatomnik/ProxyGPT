@@ -5,6 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "dotenv.h"
+
 extern char **environ;
 
 static const char *const CHATGPT_PATH =
@@ -22,6 +24,19 @@ int main(int argc, char *argv[]) {
     perror("setenv");
     return EXIT_FAILURE;
   }
+
+  Dotenv dotenv;
+  if (dotenvReadUserFile(&dotenv) == -1) {
+    perror("~/.proxygpt");
+    return EXIT_FAILURE;
+  }
+
+  if (dotenvApply(&dotenv) == -1) {
+    perror("setenv");
+    dotenvFree(&dotenv);
+    return EXIT_FAILURE;
+  }
+  dotenvFree(&dotenv);
 
   // Запускаем ChatGPT отдельным процессом. Сам launcher должен завершиться
   // сразу, иначе его процесс будет жить всё время работы ChatGPT.
