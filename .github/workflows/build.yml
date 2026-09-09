@@ -42,27 +42,33 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload archive to GitHub Release
+      - name: Create or update GitHub Release
+        if: ${{ github.ref_type == 'tag' || startsWith(github.ref_name, 'release/') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
-          # Prefer a Release matching the selected branch/tag. If the workflow
-          # was started from a branch, use the latest published Release.
-          release_tag="${GITHUB_REF_NAME#refs/tags/}"
-          if ! gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            release_tag="$(gh release view \
-              --repo "$GITHUB_REPOSITORY" \
-              --json tagName \
-              --jq .tagName 2>/dev/null || true)"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            release_tag="$GITHUB_REF_NAME"
+          else
+            release_tag="${GITHUB_REF_NAME#release/}"
           fi
 
-          if [ -n "$release_tag" ]; then
-            echo "Uploading ProxyGPT.zip to Release '$release_tag'"
+          if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Uploading ProxyGPT.zip to existing Release '$release_tag'"
             gh release upload "$release_tag" ProxyGPT.zip \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
           else
-            echo "No published Release was found; the archive is available in Actions artifacts only."
+            echo "Creating Release '$release_tag' and uploading ProxyGPT.zip"
+            gh release create "$release_tag" ProxyGPT.zip \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "ProxyGPT $release_tag" \
+              --generate-notes \
+              --verify-tag
           fi
+
+      - name: Explain missing release upload
+        if: ${{ github.ref_type != 'tag' && !startsWith(github.ref_name, 'release/') }}
+        run: echo "Build completed. Release upload is skipped because the selected ref is not a tag or release/* branch."
