@@ -1,0 +1,31 @@
+name: Build ProxyGPT
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or tag to build"
+        required: true
+        default: "main"
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Build with make
+        run: make clean && make
+
+      - name: Create archive
+        run: zip -r ProxyGPT.zip ProxyGPT.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProxyGPT
+          path: ProxyGPT.zip
+          retention-days: 30
