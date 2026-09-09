@@ -2,12 +2,9 @@ name: Build ProxyGPT
 
 on:
   workflow_dispatch:
-    inputs:
-      ref:
-        description: "Branch or tag to build"
-        required: true
-        default: "main"
-        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -20,7 +17,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ github.ref }}
 
       - name: Build arm64 binary
         run: |
@@ -44,3 +41,19 @@ jobs:
           path: ProxyGPT.zip
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload archive to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          release_tag="${RELEASE_TAG#refs/tags/}"
+
+          if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$release_tag" ProxyGPT.zip \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            echo "Release '$release_tag' was not found; the archive is available in Actions artifacts only."
+          fi
